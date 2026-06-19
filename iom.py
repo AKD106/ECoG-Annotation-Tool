@@ -93,6 +93,9 @@ class IOM_file():
         
         if (format == True):
             self.format_data()
+            offset_hours = self.get_timezone_offset(self.log['Time'][0])
+            self.offset_hours = offset_hours
+                
         
     def get_timezone_offset(self, dt):
         month = dt.month
@@ -105,11 +108,11 @@ class IOM_file():
         onsets = []
         durations = []
         descriptions = []
-        offset_hours = self.get_timezone_offset(self.log['Time'][0])
-        self.offset_hours = offset_hours
+        
+        
         for i in range(len(self.log)):
             # Determine the correct timezone offset
-            log_time = self.log['Time'][i] - datetime.timedelta(hours=offset_hours)
+            log_time = self.log['Time'][i] - datetime.timedelta(hours=self.offset_hours)
             log_time = log_time.replace(tzinfo=datetime.timezone.utc)
             log_comment = self.log['Comment'][i].strip()
             log_comment = log_comment.replace(',', ';') # Replace commas to avoid issues in CSV
@@ -165,7 +168,7 @@ class IOM_file():
         other_channel_data = []
         for c in range(len(chans)):
             chan_name = chans[c]
-            ans = re.findall('fz.*[1-8]|m.*[1-8]|[1-8].*fz|[1-8].*m', chan_name.lower())
+            ans = re.findall('^\s*(?:[A-Za-z]+\d*|\d+)\s*-\s*(?:[A-Za-z]+\d*|\d+)\s*$', chan_name.lower().strip())
             if (len(ans) == 1):
                 found_ecog_data.append({
                     'channel' : chan_name,
@@ -176,7 +179,7 @@ class IOM_file():
                     'channel' : chan_name,
                     'data' : eeg_data[c, :]
                 })
-
+        
         correct_channels = sorted(found_ecog_data, key=lambda x: x['channel'])
         other_channel_data = sorted(other_channel_data, key=lambda x: x['channel'])
         new_eeg_data = correct_channels[0]['data']
@@ -207,6 +210,7 @@ class IOM_file():
             start_time = datetime.datetime.strptime(self.eeg_timestamps[idx][0], '%d-%b-%Y %H:%M:%S')
             start_time = start_time.replace(tzinfo=datetime.timezone.utc).timestamp()
         
+        start_time = start_time - (self.offset_hours * 3600)
         mne_arr.set_meas_date(start_time)
         mne_arr = self.set_events(mne_arr)
 
